@@ -1,3 +1,50 @@
+/*
+ * [한국어] BaM page_cache.h 의 개발 백업 사본 (page_cache_backup.h)
+ *
+ * === 파일의 역할 ===
+ * 이 파일은 BaM 서브모듈(`bam/include/page_cache.h`)의 과거 시점 복사본이다.
+ * GIDS 저장소가 BaM 쪽 변경과 무관하게 독립 실험을 할 수 있도록 보존된 스냅샷
+ * (백업본)이며, 실제 빌드 경로(CMakeLists.txt → -I ../bam/include)에서는 원본
+ * `bam/include/page_cache.h` 가 선택된다. 따라서 본 파일은 런타임에 참여하지
+ * 않고 참고/롤백 용도로만 존재한다.
+ *
+ * === 작업 제외 범위 (gids-study/CLAUDE.md §6·§7) ===
+ * 프로젝트 주석 정책상 BaM 코드는 주석 작업 대상에서 제외된다. 본 백업본 또한
+ * 내부 구현(구조체, 함수, 인라인 라인)에는 한국어 주석을 추가하지 않는다.
+ * 이 상단 블록과 아래 몇몇 주요 섹션 경계 주석만 추가되며, 나머지 원본 코드는
+ * BaM 원본과 동일하게 유지한다.
+ *
+ * === 전체 아키텍처에서의 위치 ===
+ * GIDS 경로에서 실제로 쓰이는 것은 `bam/include/page_cache.h` 이다. 해당 원본은
+ * BaM의 GPU-resident 페이지 캐시(`page_cache_t`/`page_cache_d_t`), 논리 주소 ↔
+ * SSD offset 매핑(`range_t`/`range_d_t`), GPU 커널이 보는 어레이 뷰
+ * (`array_t`/`array_d_t`), device-side accessor(`bam_ptr`) 를 정의한다.
+ * 즉 이 파일의 "논리적 역할"은 `gids_nvme.cu` 의 `BAM_Feature_Store::init_controllers`
+ * 가 인스턴스화하고, `gids_kernel.cu` 의 `bam_ptr.read()` 가 호출하는 BaM
+ * 페이지 캐시 본체이다. 실행 컨텍스트는 호스트 C++(메타데이터) + GPU 디바이스(accessor).
+ *
+ * === 타 모듈과의 연결 ===
+ * - 의존(원본 기준): util.h, host_util.h, nvm_types.h, nvm_util.h, buffer.h, ctrl.h,
+ *   nvm_parallel_queue.h, nvm_cmd.h (모두 BaM 헤더). 포함 관계를 통해 NVMe SQ/CQ,
+ *   doorbell, PRP 리스트, libnvm 커널 모듈 IO 까지 연결된다.
+ * - 상위 사용: `bam_nvme.h` 의 BAM_Feature_Store<TYPE> 이 page_cache_t,
+ *   range_t<TYPE>, array_t<TYPE> 를 필드로 보유. gids_kernel.cu 의 모든 커널이
+ *   `array_d_t<T>` 포인터를 받아 `bam_ptr<T>` 로 감싸 SSD 를 읽는다.
+ * - 데이터 흐름: Python(mini-batch IDs) → BAM_Feature_Store → array_t →
+ *   [이 헤더의 page_cache] → ctrl.h 의 Controller::nvm_queue → /dev/libnvm*
+ *   → PCIe BAR0 doorbell → NVMe SSD.
+ *
+ * === 주요 함수/구조체 요약 ===
+ * - page_cache_t / page_cache_d_t : GPU 페이지 캐시 본체 (호스트/디바이스 뷰 쌍).
+ * - range_t<T> / range_d_t<T>     : 논리 인덱스 → SSD LBA 매핑. GIDS는 STRIPE 모드 사용.
+ * - array_t<T> / array_d_t<T>     : 커널에서 사용하는 배열 뷰. vr 에 range 를 묶음.
+ * - bam_ptr<T>                    : device-side accessor. read()/[] 가 페이지 캐시 hit/miss
+ *                                    판정 후 miss 시 SQE enqueue + CQE poll.
+ * - write_data(pc, qp, start_block, n_blocks, tid): 디바이스 측 쓰기 경로.
+ *
+ * (위 심볼들의 상세한 정의는 아래 원본 코드에 그대로 남겨둔다 — 주석 작업 제외.)
+ */
+
 #ifndef __PAGE_CACHE_H__
 #define __PAGE_CACHE_H__
 
