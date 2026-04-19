@@ -144,10 +144,13 @@ GIDS가 BaM을 어떻게 쓰는지를 주석에서 반드시 명시한다.
 
 | 디렉토리 | 파일 수 | 완료 | 비고 |
 |---|---|---|---|
-| `gids_module/` (C++/CUDA) | 10 | ⬜ | gids_kernel.cu, gids_nvme.cu, include/*, CMakeLists, BAM_Feature_Store/*, example/* |
-| `GIDS_Setup/GIDS/` | 4 | ⬜ | GIDS.py, __init__.py, test.py, setup.py(루트) |
-| `evaluation/` Python | 14 | ⬜ | dataloader, models, samplers, train scripts, unit test, tensor_write, page_rank |
+| `gids_module/` (C++/CUDA) | 10 | ◐ | gids_nvme.cu ●, CMakeLists.txt ●. 기타(gids_kernel.cu/include/BAM_Feature_Store/example) 미진행 |
+| `GIDS_Setup/GIDS/` | 4 | ◐ | GIDS.py ●. __init__.py/test.py/setup.py 미진행 |
+| `evaluation/` Python | 14 | ◐ | dataloader.py ●. heterogeneous_train.py ●, heterogeneous_train_baseline.py ●, homogenous_train.py ●, homogenous_train_baseline.py ●, homogenous_train_ClusterGCN.py ●, GIDS_unit_test.py ● (§3 인라인 보강 완료). models/samplers/tensor_write/page_rank 미진행 |
 | `evaluation/` Shell+CPP | 5 | ⬜ | *.sh, lock_mem.cpp |
+
+범례: ● 신기준 완료 / ◐ 일부 완료 / ⬜ 미진행.
+신기준 완료 파일(10): `GIDS_Setup/GIDS/GIDS.py`, `gids_module/gids_nvme.cu`, `evaluation/dataloader.py`, `gids_module/CMakeLists.txt`, `evaluation/heterogeneous_train.py`, `evaluation/heterogeneous_train_baseline.py`, `evaluation/homogenous_train.py`, `evaluation/homogenous_train_baseline.py`, `evaluation/homogenous_train_ClusterGCN.py`, `evaluation/GIDS_unit_test.py`.
 
 ## 9. 빌드 참고
 

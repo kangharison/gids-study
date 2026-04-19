@@ -185,19 +185,22 @@ def track_acc_Baseline(g, args, device, label_array=None):
         shuffle=True, drop_last=False,
         num_workers=args.num_workers)
 
+    # [한국어] === 모델 선택 ===
+    # GCN: 기본 GraphConvolution. SAGE: mean aggregator. GAT: attention heads.
     if args.model_type == 'gcn':
-        model = GCN(in_feats, args.hidden_channels, args.num_classes, 
-            args.num_layers).to(device)
+        model = GCN(in_feats, args.hidden_channels, args.num_classes,
+            args.num_layers).to(device)    # [한국어] in_feats → hidden → num_classes, num_layers 단.
     if args.model_type == 'sage':
-        model = SAGE(in_feats, args.hidden_channels, args.num_classes, 
+        model = SAGE(in_feats, args.hidden_channels, args.num_classes,
             args.num_layers).to(device)
     if args.model_type == 'gat':
-        model = GAT(in_feats, args.hidden_channels, args.num_classes, 
-            args.num_layers, args.num_heads).to(device)
+        model = GAT(in_feats, args.hidden_channels, args.num_classes,
+            args.num_layers, args.num_heads).to(device)   # [한국어] GAT 만 num_heads 사용.
 
+    # [한국어] CrossEntropy + Adam. weight_decay 는 L2 regularization.
     loss_fcn = nn.CrossEntropyLoss().to(device)
     optimizer = optim.Adam(
-        model.parameters(), 
+        model.parameters(),
         lr=args.learning_rate, weight_decay=args.decay
         )
 
@@ -283,25 +286,29 @@ def track_acc_Baseline(g, args, device, label_array=None):
        
   
     # Evaluation
+    # [한국어] === Evaluation (현 경로에선 warmup+eval_iter return 으로 도달하지 않음) ===
 
-    model.eval()
-    predictions = []
-    labels = []
-    with torch.no_grad():
+    model.eval()            # [한국어] dropout/bn eval 모드(결정론적).
+    predictions = []        # [한국어] 배치별 argmax 결과.
+    labels = []             # [한국어] 배치별 정답.
+    with torch.no_grad():   # [한국어] gradient 계산 비활성(메모리/속도 이득).
+        # [한국어] baseline test DataLoader 는 (input_nodes, seeds, blocks) 3-tuple.
         for _, _, blocks in test_dataloader:
-            blocks = [block.to(device) for block in blocks]
-            inputs = blocks[0].srcdata['feat']
-     
+            blocks = [block.to(device) for block in blocks]   # [한국어] MFG 를 GPU 로 이동.
+            inputs = blocks[0].srcdata['feat']                 # [한국어] host mmap feature 직접 참조.
+
             if(args.data == 'IGB'):
                 labels.append(blocks[-1].dstdata['label'].cpu().numpy())
             elif(args.data == 'OGB'):
+                # [한국어] 주의: `b` 미정의(원본 버그). label_array 는 외부 전달 텐서.
                 out_label = torch.index_select(label_array, 0, b[1]).flatten()
                 labels.append(out_label.numpy())
-            predict = model(blocks, inputs).argmax(1).cpu().numpy()
+            predict = model(blocks, inputs).argmax(1).cpu().numpy()   # [한국어] class argmax → CPU.
             predictions.append(predict)
 
         predictions = np.concatenate(predictions)
         labels = np.concatenate(labels)
+        # [한국어] 전체 test accuracy (%).
         test_acc = sklearn.metrics.accuracy_score(labels, predictions)*100
     print("Test Acc {:.2f}%".format(test_acc))
 

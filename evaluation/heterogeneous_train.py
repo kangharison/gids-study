@@ -34,46 +34,74 @@ type 별로 분리 → 각 type 의 node id + offset 을 합성하여 BaM 에서
   `key_offset` 은 node type → SSD feature 시작 인덱스(element 단위) 매핑이다.
 """
 
-# [한국어] accuracy 계산용.
+# [한국어] accuracy 계산용 — sklearn.metrics.accuracy_score(test accuracy).
 import sklearn.metrics
 
+# [한국어] DGL: NeighborSampler/DataLoader/graph format 제공. 이종 그래프 포맷 변환 API 도 동일.
 import dgl
+# [한국어] torch: 텐서/autograd. nn: 모듈 컨테이너. optim: Adam 옵티마이저(weight_decay 주석 처리).
 import torch, torch.nn as nn, torch.optim as optim
+# [한국어] time: 단계별 측정. tqdm: epoch 진행바. numpy: 예측 concat(eval 경로).
 import time, tqdm, numpy as np
+# [한국어] evaluation/models.py — RGCN/RSAGE/RGAT 제공(wildcard import).
 from models import *
-# [한국어] MLPerf 레퍼런스 RGNN(rgat 등 포함).
+# [한국어] MLPerf 레퍼런스 RGNN(rgat 등 포함). heterogeneous_train.py 의 rgat 분기만 이 모델 사용.
 from mlperf_model import RGNN
+# [한국어] 동종 그래프 로더 — 본 파일은 이종만 쓰지만 공통 import 세트 유지.
 from dataloader import IGB260MDGLDataset, OGBDGLDataset
 # [한국어] 이종 그래프 로더 — 크기별로 세 가지 클래스 제공.
+# IGBHeteroDGLDataset: small/medium/tiny (일반 버전).
+# IGBHeteroDGLDatasetMassive: large/full (mmap lazy loading).
+# OGBHeteroDGLDatasetMassive: OGB-MAG.
 from dataloader import IGBHeteroDGLDataset, IGBHeteroDGLDatasetMassive, OGBHeteroDGLDatasetMassive
 
-import csv
-import argparse, datetime
-import warnings
+import csv                              # [한국어] 로그 CSV 후보(본 경로 미사용).
+import argparse, datetime                # [한국어] CLI 파싱/타임스탬프.
+import warnings                          # [한국어] filterwarnings 로 노이즈 제거.
 
+# [한국어] torch.cuda.nvtx: PyTorch 측 NVTX push/pop. Nsight Systems 에서 학습 구간 마커로 가시화.
 import torch.cuda.nvtx as t_nvtx
+# [한국어] nvtx: @nvtx.annotate 데코레이터 — 함수 전체를 NVTX 구간으로 래핑.
 import nvtx
+# [한국어] threading/gc: 프리페처 스레드/수동 GC 실험용. 본 경로 미사용.
 import threading
 import gc
 
+# [한국어] GIDS 패키지: GIDS class(BAM_Feature_Store pybind 래퍼) 제공.
+#          heterograph=True 인자로 이종 모드 활성화.
 import GIDS
+# [한국어] GIDS_DGLDataLoader: DGL DataLoader 상속 래퍼. fetch_feature 경유로 ret 텐서 반환.
 from GIDS import GIDS_DGLDataLoader
 
+# [한국어] OGB API — Evaluator 는 현 경로 미사용.
 from ogb.graphproppred import DglGraphPropPredDataset
 from ogb.nodeproppred import DglNodePropPredDataset, Evaluator
 
+# [한국어] 재현성: torch/DGL 시드 고정. 이종 샘플러도 DGL 난수 사용.
 torch.manual_seed(0)
 dgl.seed(0)
+# [한국어] 실험 로그 깨끗하게 — deprecation/userwarning 전부 묵음.
 warnings.filterwarnings("ignore")
 
 
-# [한국어] fetch_data_chunk - NVTX 마커 래퍼(디버그용).
+# [한국어]
+# fetch_data_chunk - BAM_Feature_Store 의 backing memory 청크를 out_t 에 복사(디버그 유틸)
+# @param test: C++ BAM_Feature_Store pybind 객체. heterograph 모드에서는 fetch_hetero 경로 사용.
+# @param out_t: 결과 받을 device 텐서.
+# @param page_size: BaM page_cache_t 페이지 크기.
+# @param stream_id: CUDA stream index.
+# @return: None. NVTX blue 마커로 Nsight 가시화. 호출 체인: 실험 코드 → fetch_data_chunk → pybind.
 @nvtx.annotate("fetch_data_chunk()", color="blue")
 def fetch_data_chunk(test, out_t, page_size, stream_id):
     test.fetch_from_backing_memory_chunk(out_t.data_ptr(), page_size, stream_id)
 
 
-# [한국어] print_times - 단계별 시간 로깅.
+# [한국어]
+# print_times - 누적 시간 출력
+# @param transfer_time: blocks/labels H2D 복사 누적(초).
+# @param train_time: forward/backward/step 누적(초).
+# @param e2e_time: 측정 구간 end-to-end wall-clock(초).
+# @return: None.
 def print_times(transfer_time, train_time, e2e_time):
     print("transfer time: ", transfer_time)
     print("train time: ", train_time)
@@ -379,42 +407,49 @@ def track_acc_GIDS(g, category, args, device, dim , label_array=None, key_offset
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     # Loading dataset
+    # [한국어] --path: IGBH/OGB topology 파일 루트 경로. feature 는 SSD 에 별도 저장(GIDS 경로).
     parser.add_argument('--path', type=str, default='/mnt/nvme14/IGB260M',
         help='path containing the datasets')
     # [한국어] --dataset_size: 이종 버전은 tiny/small/medium/large/full 지원.
+    #          default 'experimental' 은 choices 와 일치 안 함(원본 버그) — 실행 시 지정 필수.
     parser.add_argument('--dataset_size', type=str, default='experimental',
         choices=['tiny', 'small', 'medium', 'large', 'full'],
         help='size of the datasets')
     # [한국어] --num_classes: IGBH paper 기준 2983 / full 153 등 다양.
+    #          19=IGB homogeneous, 2983=IGBH paper subject, 172=OGB-arxiv, 348~350=IGBH 확장.
     parser.add_argument('--num_classes', type=int, default=19,
         choices=[19, 2983, 172, 348,349, 350, 153, 152], help='number of classes')
-    parser.add_argument('--in_memory', type=int, default=0, 
+    # [한국어] --in_memory: 0=mmap(권장), 1=RAM 로드. GIDS 경로는 feature 를 SSD 에 두므로 0 권장.
+    parser.add_argument('--in_memory', type=int, default=0,
         choices=[0, 1], help='0:read only mmap_mode=r, 1:load into memory')
+    # [한국어] --synthetic: 1이면 feature 대신 랜덤 텐서(디버그).
     parser.add_argument('--synthetic', type=int, default=0,
         choices=[0, 1], help='0:nlp-node embeddings, 1:random')
+    # [한국어] --data: IGB/OGB 데이터셋 계열 선택(아래 로더 분기).
     parser.add_argument('--data', type=str, default='IGB')
+    # [한국어] --emb_size: feature 차원(=dim). IGBH 는 1024 고정.
     parser.add_argument('--emb_size', type=int, default=1024)
-    
+
     # Model
     # [한국어] 이종 모델 3종: rgat/rsage/rgcn. default 'gcn' 은 매칭되지 않아 모델 미설정 버그 가능(원본 유지).
     parser.add_argument('--model_type', type=str, default='gcn',
                         choices=['rgat', 'rsage', 'rgcn'])
-    parser.add_argument('--modelpath', type=str, default='deletethis.pt')
-    parser.add_argument('--model_save', type=int, default=0)
+    parser.add_argument('--modelpath', type=str, default='deletethis.pt')   # [한국어] 체크포인트 경로(미사용).
+    parser.add_argument('--model_save', type=int, default=0)                 # [한국어] 1이면 학습 후 저장(미사용).
 
     # Model parameters
-    parser.add_argument('--fan_out', type=str, default='10,15')
-    parser.add_argument('--batch_size', type=int, default=1024)
-    parser.add_argument('--num_workers', type=int, default=0)
-    # [한국어] 이종 기본 hidden=512(동종보다 큼) — 모델 용량 확보.
+    parser.add_argument('--fan_out', type=str, default='10,15')              # [한국어] layer별 fanout. 이종도 동일 문법.
+    parser.add_argument('--batch_size', type=int, default=1024)              # [한국어] seed(category) 노드 수.
+    parser.add_argument('--num_workers', type=int, default=0)                 # [한국어] DataLoader worker 수.
+    # [한국어] 이종 기본 hidden=512(동종보다 큼) — RGAT 용량 확보(MLPerf 권장).
     parser.add_argument('--hidden_channels', type=int, default=512)
     # [한국어] 이종 기본 lr=0.001(동종 0.01 보다 작게) — MLPerf 추천값.
     parser.add_argument('--learning_rate', type=float, default=0.001)
-    parser.add_argument('--decay', type=float, default=0.001)
-    parser.add_argument('--epochs', type=int, default=1)
-    parser.add_argument('--num_layers', type=int, default=6)
-    parser.add_argument('--num_heads', type=int, default=4)
-    parser.add_argument('--log_every', type=int, default=2)
+    parser.add_argument('--decay', type=float, default=0.001)                 # [한국어] L2 weight_decay (현재 코드에선 주석 처리).
+    parser.add_argument('--epochs', type=int, default=1)                      # [한국어] 이종은 1 epoch 이 대세(데이터 규모 큼).
+    parser.add_argument('--num_layers', type=int, default=6)                  # [한국어] GNN 레이어 수.
+    parser.add_argument('--num_heads', type=int, default=4)                   # [한국어] RGAT attention heads.
+    parser.add_argument('--log_every', type=int, default=2)                   # [한국어] 로깅 주기.
 
     #GIDS parameter
     # [한국어] GIDS 활성 / BaM 컨트롤러 수 / page cache 크기 등 — 동종 버전과 동일 의미.

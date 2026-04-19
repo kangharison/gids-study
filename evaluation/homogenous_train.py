@@ -348,6 +348,8 @@ def track_acc_GIDS(g, args, device, label_array=None):
 
     # Evaluation
     # [한국어] === 단계 7: Evaluation (현재 경로에서는 위 return 으로 인해 도달하지 않음) ===
+    # 주의: test_dataloader 는 일반 DGL DataLoader 이므로 feature fetch 는 host-side 에서 수행됨.
+    # 실제 production 평가에서는 test_dataloader 도 GIDS 경로로 교체하는 것이 일관적.
 
     model.eval()         # [한국어] dropout/bn eval 모드.
     predictions = []     # [한국어] 배치별 argmax 결과 축적.
@@ -355,7 +357,7 @@ def track_acc_GIDS(g, args, device, label_array=None):
     with torch.no_grad():  # [한국어] gradient 비활성 → 메모리 절약.
         for _, _, blocks in test_dataloader:
             blocks = [block.to(device) for block in blocks]   # [한국어] MFG device 이동.
-            inputs = blocks[0].srcdata['feat']                 # [한국어] baseline: feat을 graph 에서 직접 사용.
+            inputs = blocks[0].srcdata['feat']                 # [한국어] baseline: feat을 graph 에서 직접 사용(GIDS 경로 아님).
 
             if(args.data == 'IGB'):
                 labels.append(blocks[-1].dstdata['label'].cpu().numpy())  # [한국어] eval용 label → host numpy.

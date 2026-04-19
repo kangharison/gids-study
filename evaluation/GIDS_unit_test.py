@@ -52,27 +52,30 @@ if __name__ == '__main__':
 
     parser = argparse.ArgumentParser()
     # Loading dataset
-    parser.add_argument('--path', type=str, default='/mnt/nvme14/IGB260M', 
+    # [한국어] 아래 데이터셋 관련 인자는 학습 스크립트와 CLI 호환을 위해 수용 — unit test 에서는 실제 로드하지 않음.
+    parser.add_argument('--path', type=str, default='/mnt/nvme14/IGB260M',
         help='path containing the datasets')
     parser.add_argument('--dataset_size', type=str, default='experimental',
-        choices=['experimental', 'small', 'medium', 'large', 'full'], 
+        choices=['experimental', 'small', 'medium', 'large', 'full'],
         help='size of the datasets')
-    parser.add_argument('--num_classes', type=int, default=19, 
+    parser.add_argument('--num_classes', type=int, default=19,
         choices=[19, 2983, 172, 348,349, 350, 153, 152], help='number of classes')
-    parser.add_argument('--in_memory', type=int, default=0, 
+    parser.add_argument('--in_memory', type=int, default=0,
         choices=[0, 1], help='0:read only mmap_mode=r, 1:load into memory')
     parser.add_argument('--synthetic', type=int, default=0,
         choices=[0, 1], help='0:nlp-node embeddings, 1:random')
     parser.add_argument('--data', type=str, default='IGB')
     parser.add_argument('--emb_size', type=int, default=1024)
-    
+
     # Model
+    # [한국어] Model 인자군 — unit test 는 모델을 인스턴스화하지 않음. CLI 호환 수용.
     parser.add_argument('--model_type', type=str, default='gcn',
                         choices=['rgat', 'rsage', 'rgcn'])
     parser.add_argument('--modelpath', type=str, default='deletethis.pt')
     parser.add_argument('--model_save', type=int, default=0)
 
-    # Model parameters 
+    # Model parameters
+    # [한국어] 하이퍼파라미터 — unit test 미사용. default 그대로.
     parser.add_argument('--fan_out', type=str, default='10,15')
     parser.add_argument('--batch_size', type=int, default=1024)
     parser.add_argument('--num_workers', type=int, default=0)
@@ -85,9 +88,10 @@ if __name__ == '__main__':
     parser.add_argument('--log_every', type=int, default=2)
 
     #GIDS parameter
-    parser.add_argument('--GIDS', action='store_true', help='Enable GIDS Dataloader')
-    parser.add_argument('--num_ssd', type=int, default=1)
-    parser.add_argument('--cache_size', type=int, default=8)
+    # [한국어] GIDS/BaM 핵심 인자 — 실제 unit test 에서 의미 있는 것은 --num_ssd / --cache_size / --num_ele.
+    parser.add_argument('--GIDS', action='store_true', help='Enable GIDS Dataloader')   # [한국어] unit test 에서는 GIDS.GIDS 직접 호출.
+    parser.add_argument('--num_ssd', type=int, default=1)        # [한국어] BaM Controller 수 → init_GIDS_controllers(ssd_list).
+    parser.add_argument('--cache_size', type=int, default=8)      # [한국어] BaM page_cache(MB).
     parser.add_argument('--uva', type=int, default=0)
     parser.add_argument('--uva_graph', type=int, default=0)
     parser.add_argument('--wb_size', type=int, default=6)
@@ -95,6 +99,7 @@ if __name__ == '__main__':
     parser.add_argument('--device', type=int, default=0)
 
     #GIDS Optimization
+    # [한국어] Accumulator 관련 하드웨어 파라미터 — unit test 미사용.
     parser.add_argument('--accumulator', action='store_true', help='Enable Storage Access Accmulator')
     parser.add_argument('--bw', type=float, default=5.8, help='SSD peak bandwidth in GB/s')
     parser.add_argument('--l_ssd', type=float, default=11.0, help='SSD latency in microseconds')
@@ -103,9 +108,10 @@ if __name__ == '__main__':
 
     parser.add_argument('--num_iter', type=int, default=1)
 
+    # [한국어] CPU Buffer 관련 — unit test 는 단순 fetch_test 이므로 미사용.
     parser.add_argument('--cpu_buffer', action='store_true', help='Enable CPU Feature Buffer')
     parser.add_argument('--cpu_buffer_percent', type=float, default=0.2, help='CPU feature buffer size (0.1 for 10%)')
-    parser.add_argument('--pin_file', type=str, default="/mnt/nvme16/pr_full.pt", 
+    parser.add_argument('--pin_file', type=str, default="/mnt/nvme16/pr_full.pt",
         help='Pytorch Tensor File for the list of nodes that will be pinned in the CPU feature buffer')
 
     parser.add_argument('--window_buffer', action='store_true', help='Enable Window Buffering')
@@ -113,9 +119,10 @@ if __name__ == '__main__':
 
 
     #GPU Software Cache Parameters
+    # [한국어] BaM page_cache 관련 — unit test 는 4KB page 하드코딩으로 덮어씀(아래 GIDS.GIDS 호출 참조).
     parser.add_argument('--page_size', type=int, default=8)
-    parser.add_argument('--offset', type=int, default=0, help='Offset for the feature data stored in the SSD') 
-    parser.add_argument('--num_ele', type=int, default=100, help='Number of elements in the dataset (Total Size / sizeof(Type)') 
+    parser.add_argument('--offset', type=int, default=0, help='Offset for the feature data stored in the SSD')
+    parser.add_argument('--num_ele', type=int, default=100, help='Number of elements in the dataset (Total Size / sizeof(Type)')
     parser.add_argument('--cache_dim', type=int, default=1024) #CHECK
 
 

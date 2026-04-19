@@ -694,27 +694,29 @@ class IGBHeteroDGLDatasetMassive(DGLDataset):
 
         # n_nodes = paper_node_features.shape[0]
 
-        n_train = int(n_nodes * 0.6)
-        n_val = int(n_nodes * 0.2)
-        
+        n_train = int(n_nodes * 0.6)                                        # [한국어] 60% = train. paper 노드만 분류 대상이므로 paper 수 기준.
+        n_val = int(n_nodes * 0.2)                                          # [한국어] 20% = val. 나머지 20% = test.
 
-        train_mask = torch.zeros(n_nodes, dtype=torch.bool)
+
+        train_mask = torch.zeros(n_nodes, dtype=torch.bool)                 # [한국어] 초기 False. 이후 perm 으로 선택된 인덱스만 True.
         val_mask = torch.zeros(n_nodes, dtype=torch.bool)
         test_mask = torch.zeros(n_nodes, dtype=torch.bool)
-        
-        perm = torch.randperm(n_nodes)
 
-        train_mask[perm[:n_train]] = True
-        val_mask[perm[n_train:n_train + n_val]] = True
-        test_mask[perm[n_train + n_val:]] = True
-        
-        self.graph.nodes['paper'].data['train_mask'] = train_mask
+        perm = torch.randperm(n_nodes)                                       # [한국어] 무작위 순열. torch 기본 시드 사용 — 학습 스크립트가 set_seed 로 고정해야 재현 가능.
+
+        train_mask[perm[:n_train]] = True                                    # [한국어] 앞 60% 슬라이스 → train.
+        val_mask[perm[n_train:n_train + n_val]] = True                       # [한국어] 다음 20% → val.
+        test_mask[perm[n_train + n_val:]] = True                             # [한국어] 나머지 → test.
+
+        self.graph.nodes['paper'].data['train_mask'] = train_mask            # [한국어] DGL 에서 paper 노드에만 mask 부착 — 분류 head 가 paper 만 예측.
         self.graph.nodes['paper'].data['val_mask'] = val_mask
         self.graph.nodes['paper'].data['test_mask'] = test_mask
-        
+
+    # [한국어] DGL Dataset 프로토콜 — 학습 스크립트 dataset[0] 호출 시 heterograph 반환. i 는 무시(단일 그래프).
     def __getitem__(self, i):
         return self.graph
 
+    # [한국어] DGL Dataset 표준 길이. IGBH massive 는 단일 graph 만 보유하므로 1 고정.
     def __len__(self):
         return 1
 
@@ -810,33 +812,35 @@ class IGBHeteroDGLDatasetTest(DGLDataset):
        
         self.graph.nodes['fos'].data['feat'] = fos_node_features
         self.graph.num_fos_nodes = fos_node_features.shape[0]
-        self.graph.nodes['institute'].data['feat'] = institute_node_features
-        self.graph.num_institute_nodes = institute_node_features.shape[0]
-        self.graph = dgl.remove_self_loop(self.graph, etype='cites')
-        self.graph = dgl.add_self_loop(self.graph, etype='cites')
-        
-        n_nodes = paper_node_features.shape[0]
+        self.graph.nodes['institute'].data['feat'] = institute_node_features  # [한국어] institute feature 부착.
+        self.graph.num_institute_nodes = institute_node_features.shape[0]      # [한국어] GIDS offset 참고용.
+        self.graph = dgl.remove_self_loop(self.graph, etype='cites')          # [한국어] GCN 안정성 — paper→paper cites 만 대상.
+        self.graph = dgl.add_self_loop(self.graph, etype='cites')             # [한국어] add_self_loop 로 i→i 엣지 보강.
 
-        n_train = int(n_nodes * 0.6)
-        n_val = int(n_nodes * 0.2)
+        n_nodes = paper_node_features.shape[0]                                 # [한국어] paper 노드 기준으로 mask 분할 (분류 대상).
 
-        train_mask = torch.zeros(n_nodes, dtype=torch.bool)
+        n_train = int(n_nodes * 0.6)                                           # [한국어] 60% train.
+        n_val = int(n_nodes * 0.2)                                             # [한국어] 20% val / 20% test.
+
+        train_mask = torch.zeros(n_nodes, dtype=torch.bool)                    # [한국어] False 초기화.
         val_mask = torch.zeros(n_nodes, dtype=torch.bool)
         test_mask = torch.zeros(n_nodes, dtype=torch.bool)
-        
-        perm = torch.randperm(n_nodes)
-        train_mask[perm[:n_train]] = True
-        val_mask[perm[n_train:n_train + n_val]] = True
-        test_mask[perm[n_train + n_val:]] = True
-        
-        self.graph.nodes['paper'].data['train_mask'] = train_mask
+
+        perm = torch.randperm(n_nodes)                                          # [한국어] 무작위 순열 — IGBHeteroDGLDatasetTest 전용 분할.
+        train_mask[perm[:n_train]] = True                                       # [한국어] 앞 60% 선택.
+        val_mask[perm[n_train:n_train + n_val]] = True                          # [한국어] 다음 20%.
+        test_mask[perm[n_train + n_val:]] = True                                # [한국어] 나머지 20%.
+
+        self.graph.nodes['paper'].data['train_mask'] = train_mask               # [한국어] paper 노드에만 부착.
         self.graph.nodes['paper'].data['val_mask'] = val_mask
         self.graph.nodes['paper'].data['test_mask'] = test_mask
-        
 
+
+    # [한국어] DGL Dataset 프로토콜 — heterograph 1개 반환.
     def __getitem__(self, i):
         return self.graph
 
+    # [한국어] 단일 그래프 고정 길이 1. DGLDataset 베이스 요구사항.
     def __len__(self):
         return 1
 

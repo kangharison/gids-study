@@ -31,29 +31,44 @@ BaM 에서 읽어온다. `bam=True` 플래그가 DGL 이 내부에서 GIDS fetch
 """
 
 # [한국어] 공통 임포트 — 학습/샘플러/GIDS.
+# argparse: CLI. datetime: 타임스탬프(미사용이나 공통 세트 유지).
 import argparse, datetime
+# [한국어] DGL: NeighborSampler/ClusterGCNSampler/DataLoader 제공.
+#          GIDS fork 버전 DGL 은 bam=True / GIDS= 키워드 추가 지원.
 import dgl
+# [한국어] sklearn.metrics: eval accuracy_score.
 import sklearn.metrics
+# [한국어] torch: 텐서. nn: SAGEConv/Dropout. optim: Adam.
 import torch, torch.nn as nn, torch.optim as optim
+# [한국어] time/tqdm/numpy: 측정/진행/eval concat.
 import time, tqdm, numpy as np
+# [한국어] models.py: GCN/SAGE/GAT — 본 스크립트는 ClusterSAGE 내부 정의 + dglnn 직접 사용이므로 주석 처리되어 실질 미사용.
 from models import *    # [한국어] GCN/SAGE/GAT (현 경로에서는 주석 처리되어 미사용).
+# [한국어] IGB260M/OGB 동종 그래프 로더(이 스크립트는 동종만 지원).
 from dataloader import IGB260MDGLDataset, OGBDGLDataset
-import csv
-import warnings
+import csv                                 # [한국어] csv 로깅 후보(미사용).
+import warnings                             # [한국어] 경고 억제.
 
+# [한국어] torch.cuda.nvtx/nvtx: NVTX 마커(프로파일링).
 import torch.cuda.nvtx as t_nvtx
 import nvtx
+# [한국어] threading/gc: 프리페처/명시적 GC 후보(미사용).
 import threading
 import gc
 
-# [한국어] GIDS: BaM 기반 feature fetch 경로.
+# [한국어] GIDS: BaM 기반 feature fetch 경로. GIDS.GIDS 로 Controller/page_cache 초기화.
 import GIDS
 # [한국어] LADIES/PoissonLADIES 샘플러(layer-wise importance sampling 변종).
+# LadiesSampler: 각 레이어마다 importance score 기반 sub-sampling.
+# normalized_edata: edge weight 정규화 헬퍼 — edata['w'] 로 저장.
+# PoissonLadiesSampler: Poisson 분포 기반 LADIES 변종.
 from ladies_sampler import LadiesSampler, normalized_edata, PoissonLadiesSampler
 
+# [한국어] OGB API. Evaluator 는 본 경로 미사용.
 from ogb.graphproppred import DglGraphPropPredDataset
 from ogb.nodeproppred import DglNodePropPredDataset, Evaluator
 
+# [한국어] 재현성/노이즈 억제.
 torch.manual_seed(0)
 dgl.seed(0)
 warnings.filterwarnings("ignore")
@@ -239,31 +254,38 @@ def track_acc_GIDS(g, args, device, label_array=None):
         lr=args.learning_rate, weight_decay=args.decay
         )
 
+    # [한국어] warm_up_iter=100 — ClusterGCN 은 각 step 당 큰 subgraph 이므로 warm-up 을 짧게.
     warm_up_iter = 100
     # Setup is Done
+    # [한국어] === epoch 루프 ===
     for epoch in tqdm.tqdm(range(args.epochs)):
-        epoch_start = time.time()
-        epoch_loss = 0
-        train_acc = 0
-        model.train()
+        epoch_start = time.time()      # [한국어] 참고용.
+        epoch_loss = 0                  # [한국어] loss 누적.
+        train_acc = 0                   # [한국어] accuracy placeholder.
+        model.train()                   # [한국어] training 모드 활성.
 
-        batch_input_time = 0
-        train_time = 0
-        transfer_time = 0
-        e2e_time = 0
-        e2e_time_start = time.time()
+        batch_input_time = 0            # [한국어] feature fetch 시간(BaM 내부 기록).
+        train_time = 0                  # [한국어] forward/backward 누적.
+        transfer_time = 0               # [한국어] blocks.to(device) 누적.
+        e2e_time = 0                    # [한국어] 구간 e2e wall-clock.
+        e2e_time_start = time.time()    # [한국어] 구간 시작 시각.
 
         # [한국어] ClusterGCN 경로: 반환이 (sg, ret) 형태. sg 는 subgraph, ret 은 BaM fetch 결과.
         # (주석 처리된 원본은 이웃 샘플링 unpack 형식.)
  #       for step, (input_nodes, seeds, blocks, ret) in enumerate(train_dataloader):
+        # [한국어] ClusterGCN iter: (sg, ret). sg = partition 하나의 subgraph(dgl graph).
+        #          주의: enumerate 는 (idx, item) 를 반환하므로 실제 unpack 은 (step, (sg, ret)) 여야 정상.
+        #          원본은 3-tuple unpack 에 의존 — 현재 bam=True fork DGL 의 yield 포맷에 따라 동작이 달라질 수 있음.
         for step, sg, ret in enumerate(train_dataloader):
 
             if(step % 10 == 0):
-                print("step: ", step)
+                print("step: ", step)   # [한국어] 10 step 마다 진행 로그(ClusterGCN 은 step 수가 num_partitions).
             if(step == warm_up_iter):
+                # [한국어] warm-up 경계 — BaM page_cache / OS state 가 안정화된 시점.
                 print("warp up done")
-                train_dataloader.print_stats()
-                train_dataloader.print_timer()
+                train_dataloader.print_stats()   # [한국어] BAM_Feature_Store cache hit/miss 통계.
+                train_dataloader.print_timer()   # [한국어] fetch 시간 분해(kernel/sync).
+                # [한국어] 통계 리셋 — 측정 구간 시작.
                 batch_input_time = 0
                 transfer_time = 0
                 train_time = 0
@@ -319,18 +341,22 @@ def track_acc_GIDS(g, args, device, label_array=None):
        
   
     # Evaluation
+    # [한국어] === Evaluation (현 경로에서 warmup+100 return 에 의해 도달하지 않음) ===
 
-    model.eval()
-    predictions = []
-    labels = []
-    with torch.no_grad():
+    model.eval()           # [한국어] dropout 꺼서 결정론적 추론.
+    predictions = []       # [한국어] 배치별 argmax.
+    labels = []            # [한국어] 배치별 정답.
+    with torch.no_grad():  # [한국어] gradient 계산 비활성.
+        # [한국어] test_dataloader 는 DGL 일반 DataLoader — (input_nodes, seeds, blocks, _) 4-tuple.
+        #          마지막 원소(_) 는 bam fetch 가 없는 경우 None 또는 placeholder.
         for _, _, blocks,_ in test_dataloader:
-            blocks = [block.to(device) for block in blocks]
-            inputs = blocks[0].srcdata['feat']
-     
+            blocks = [block.to(device) for block in blocks]    # [한국어] MFG GPU 이동.
+            inputs = blocks[0].srcdata['feat']                  # [한국어] baseline 경로 — host feature 직접 참조.
+
             if(args.data == 'IGB'):
                 labels.append(blocks[-1].dstdata['label'].cpu().numpy())
             elif(args.data == 'OGB'):
+                # [한국어] 주의: `b` 미정의(원본 버그). 이 분기 실제 진입 시 NameError.
                 out_label = torch.index_select(label_array, 0, b[1]).flatten()
                 labels.append(out_label.numpy())
             predict = model(blocks, inputs).argmax(1).cpu().numpy()
@@ -338,6 +364,7 @@ def track_acc_GIDS(g, args, device, label_array=None):
 
         predictions = np.concatenate(predictions)
         labels = np.concatenate(labels)
+        # [한국어] 전체 accuracy(%).
         test_acc = sklearn.metrics.accuracy_score(labels, predictions)*100
     print("Test Acc {:.2f}%".format(test_acc))
 
