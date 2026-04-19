@@ -144,13 +144,13 @@ GIDS가 BaM을 어떻게 쓰는지를 주석에서 반드시 명시한다.
 
 | 디렉토리 | 파일 수 | 완료 | 비고 |
 |---|---|---|---|
-| `gids_module/` (C++/CUDA) | 10 | ◐ | gids_nvme.cu ●, CMakeLists.txt ●. 기타(gids_kernel.cu/include/BAM_Feature_Store/example) 미진행 |
-| `GIDS_Setup/GIDS/` | 4 | ◐ | GIDS.py ●. __init__.py/test.py/setup.py 미진행 |
-| `evaluation/` Python | 14 | ◐ | dataloader.py ●. heterogeneous_train.py ●, heterogeneous_train_baseline.py ●, homogenous_train.py ●, homogenous_train_baseline.py ●, homogenous_train_ClusterGCN.py ●, GIDS_unit_test.py ● (§3 인라인 보강 완료). models/samplers/tensor_write/page_rank 미진행 |
-| `evaluation/` Shell+CPP | 5 | ⬜ | *.sh, lock_mem.cpp |
+| `gids_module/` (C++/CUDA + pybind 패키지) | 10 | ● | gids_nvme.cu ●, CMakeLists.txt ●, gids_kernel.cu ●, include/bam_nvme.h ●, include/example.h ●, include/page_cache_backup.h ●(간결), BAM_Feature_Store/__init__.py ●, BAM_Feature_Store/setup.py ●, example/__init__.py ●, example/setup.py ● |
+| `GIDS_Setup/GIDS/` | 4 | ● | GIDS.py ●, __init__.py ●, test.py ●, setup.py ● |
+| `evaluation/` Python | 14 | ● | dataloader.py ●, heterogeneous_train.py ●, heterogeneous_train_baseline.py ●, homogenous_train.py ●, homogenous_train_baseline.py ●, homogenous_train_ClusterGCN.py ●, GIDS_unit_test.py ●, models.py ●, mlperf_model.py ●, ladies_sampler.py ●, page_rank_node_list_gen.py ●, tensor_write.py ● |
+| `evaluation/` Shell+CPP | 7 | ● | lock_mem.cpp ●, gids_unit_test.sh ●, run_base_IGBH.sh ●, run_GIDS_IGBH.sh ●, run_BaM_IGBH.sh ●, write_data.sh ●, write_data_full.sh ● |
 
 범례: ● 신기준 완료 / ◐ 일부 완료 / ⬜ 미진행.
-신기준 완료 파일(10): `GIDS_Setup/GIDS/GIDS.py`, `gids_module/gids_nvme.cu`, `evaluation/dataloader.py`, `gids_module/CMakeLists.txt`, `evaluation/heterogeneous_train.py`, `evaluation/heterogeneous_train_baseline.py`, `evaluation/homogenous_train.py`, `evaluation/homogenous_train_baseline.py`, `evaluation/homogenous_train_ClusterGCN.py`, `evaluation/GIDS_unit_test.py`.
+신기준 완료 파일(28): `GIDS_Setup/GIDS/GIDS.py`, `GIDS_Setup/GIDS/__init__.py`, `GIDS_Setup/GIDS/test.py`, `GIDS_Setup/setup.py`, `gids_module/gids_nvme.cu`, `gids_module/gids_kernel.cu`, `gids_module/include/bam_nvme.h`, `gids_module/include/example.h`, `gids_module/CMakeLists.txt`, `gids_module/BAM_Feature_Store/__init__.py`, `gids_module/BAM_Feature_Store/setup.py`, `gids_module/example/__init__.py`, `gids_module/example/setup.py`, `evaluation/dataloader.py`, `evaluation/heterogeneous_train.py`, `evaluation/heterogeneous_train_baseline.py`, `evaluation/homogenous_train.py`, `evaluation/homogenous_train_baseline.py`, `evaluation/homogenous_train_ClusterGCN.py`, `evaluation/GIDS_unit_test.py`, `evaluation/models.py`, `evaluation/mlperf_model.py`, `evaluation/ladies_sampler.py`, `evaluation/page_rank_node_list_gen.py`, `evaluation/tensor_write.py`, `evaluation/lock_mem.cpp`, `evaluation/gids_unit_test.sh`, `evaluation/run_base_IGBH.sh`, `evaluation/run_GIDS_IGBH.sh`, `evaluation/run_BaM_IGBH.sh`, `evaluation/write_data.sh`, `evaluation/write_data_full.sh`. 간결 처리(1): `gids_module/include/page_cache_backup.h`.
 
 ## 9. 빌드 참고
 
